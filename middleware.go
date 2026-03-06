@@ -107,14 +107,16 @@ func NewWithConfig(logger *slog.Logger, config Config) func(http.Handler) http.H
 			query := r.URL.RawQuery
 
 			// dump request body
-			br := newBodyReader(r.Body, RequestBodyMaxSize, config.WithRequestBody)
+			br := getBodyReaderBuffer(r.Body, RequestBodyMaxSize, config.WithRequestBody)
+			defer releaseBodyReaderBuffer(br)
 			r.Body = br
 
 			// dump response body
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 			var bw *bodyWriter
 			if config.WithResponseBody {
-				bw = newBodyWriter(ResponseBodyMaxSize)
+				bw = getBodyWriterBuffer(ResponseBodyMaxSize)
+				defer releaseBodyWriterBuffer(bw)
 				ww.Tee(bw)
 			}
 
@@ -176,7 +178,9 @@ func NewWithConfig(logger *slog.Logger, config Config) func(http.Handler) http.H
 				}
 
 				// otel
-				baseAttributes = append(baseAttributes, extractTraceSpanID(r.Context(), config.WithTraceID, config.WithSpanID)...)
+				baseAttributes = append(
+					baseAttributes,
+					extractTraceSpanID(r.Context(), config.WithTraceID, config.WithSpanID)...)
 
 				// request body
 				requestAttributes = append(requestAttributes, slog.Int("length", br.bytes))

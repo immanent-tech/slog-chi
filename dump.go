@@ -3,6 +3,7 @@ package slogchi
 import (
 	"bytes"
 	"io"
+	"sync"
 )
 
 type bodyWriter struct {
@@ -21,11 +22,24 @@ func (w *bodyWriter) Write(b []byte) (int, error) {
 	return w.body.Write(b)
 }
 
-func newBodyWriter(maxSize int) *bodyWriter {
-	return &bodyWriter{
-		body:    bytes.NewBufferString(""),
-		maxSize: maxSize,
-	}
+var bwBuf = sync.Pool{
+	New: func() any {
+		return &bodyWriter{
+			body: bytes.NewBufferString(""),
+		}
+	},
+}
+
+func getBodyWriterBuffer(maxSize int) *bodyWriter {
+	buf := bwBuf.Get().(*bodyWriter)
+	buf.maxSize = maxSize
+	return buf
+}
+
+func releaseBodyWriterBuffer(b *bodyWriter) {
+	b.body.Reset()
+	b.maxSize = 0
+	bwBuf.Put(b)
 }
 
 type bodyReader struct {
@@ -49,15 +63,25 @@ func (r *bodyReader) Read(b []byte) (int, error) {
 	return n, err
 }
 
-func newBodyReader(reader io.ReadCloser, maxSize int, recordBody bool) *bodyReader {
-	var body *bytes.Buffer
-	if recordBody {
-		body = bytes.NewBufferString("")
-	}
-	return &bodyReader{
-		ReadCloser: reader,
-		body:       body,
-		maxSize:    maxSize,
-		bytes:      0,
-	}
+var brBuf = sync.Pool{
+	New: func() any {
+		return &bodyReader{
+			body:  bytes.NewBufferString(""),
+			bytes: 0,
+		}
+	},
+}
+
+func getBodyReaderBuffer(reader io.ReadCloser, maxSize int, _ bool) *bodyReader {
+	buf := brBuf.Get().(*bodyReader)
+	buf.maxSize = maxSize
+	buf.ReadCloser = reader
+	return buf
+}
+
+func releaseBodyReaderBuffer(b *bodyReader) {
+	b.body.Reset()
+	b.maxSize = 0
+	b.bytes = 0
+	brBuf.Put(b)
 }
