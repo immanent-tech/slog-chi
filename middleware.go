@@ -19,9 +19,11 @@ type customAttributesCtxKeyType struct{}
 var customAttributesCtxKey = customAttributesCtxKeyType{}
 
 var (
-	TraceIDKey   = "trace_id"
-	SpanIDKey    = "span_id"
-	RequestIDKey = "id"
+	TraceIDKey       = "trace_id"
+	SpanIDKey        = "span_id"
+	RequestIDKey     = "id"
+	RequestGroupKey  = "request"
+	ResponseGroupKey = "response"
 
 	RequestBodyMaxSize  = 64 * 1024 // 64KB
 	ResponseBodyMaxSize = 64 * 1024 // 64KB
@@ -229,11 +231,11 @@ func NewWithConfig(logger *slog.Logger, config Config) func(http.Handler) http.H
 				attributes := append(
 					[]slog.Attr{
 						{
-							Key:   "request",
+							Key:   RequestGroupKey,
 							Value: slog.GroupValue(requestAttributes...),
 						},
 						{
-							Key:   "response",
+							Key:   ResponseGroupKey,
 							Value: slog.GroupValue(responseAttributes...),
 						},
 					},
